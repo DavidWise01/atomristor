@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATOMRISTOR — single-atom-thick memristor</title>
+<style>
+  :root{
+    --bg:#0a0612; --panel:#140b22; --ink:#e9e2f5; --dim:#9d8bc4; --faint:#5f5080;
+    --violet:#a78bfa; --violet2:#c4b5fd; --gold:#d99a2b; --cyan:#5eead4; --pink:#f472b6; --red:#fb7185;
+    --mono:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+    --serif:'Iowan Old Style',Palatino,Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);
+    background:radial-gradient(1100px 700px at 50% 0%,#1a0f2e 0%,#0a0612 60%)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
+  h1{font-size:30px;margin:0 0 2px;letter-spacing:.5px}
+  h1 b{color:var(--violet)}
+  .sub{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.04em;margin-bottom:4px}
+  .note{font-family:var(--mono);font-size:11px;color:var(--faint);margin:8px 0 18px;line-height:1.7;
+    border-left:2px solid var(--faint);padding-left:10px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid #2a1d44;border-radius:12px;padding:14px}
+  .card h2{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--violet);margin:0 0 10px;font-weight:600}
+  canvas{display:block;width:100%;border-radius:8px}
+  .read{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-family:var(--mono);font-size:12px}
+  .read .k{color:var(--faint)} .read .v{color:var(--ink);font-weight:700}
+  .state-on{color:var(--cyan)} .state-off{color:var(--red)}
+  .controls{margin-top:16px;background:var(--panel);border:1px solid #2a1d44;border-radius:12px;padding:14px}
+  .vrow{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+  input[type=range]{flex:1;accent-color:var(--violet)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;color:#1a0a02;
+    background:var(--violet);border:none;border-radius:8px;padding:9px 16px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--faint)}
+  button:active{transform:translateY(1px)}
+  .legend{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:8px;line-height:1.8}
+  .legend b{color:var(--violet2)}
+  .dotB{color:#7dd3fc} .dotN{color:#fca5a5} .dotM{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><b>ATOMRISTOR</b> — a memristor one atom thick</h1>
+  <div class="sub">blueprint + working prototype · monolayer hBN resistive switch · canvas 2D</div>
+  <div class="note">
+    CONCEPTUAL SIMULATION — captures the accepted switching mechanism (a single metal atom migrating
+    into a lattice vacancy to form a one-atom conductive bridge) and the pinched I–V hysteresis that is
+    the defining signature of a memristor. Mechanism is real; the resistances and thresholds are
+    representative, not measured. This is an intuition instrument, not a SPICE/DFT device model.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Blueprint — cross-section</h2>
+      <canvas id="bp"></canvas>
+      <div class="legend">
+        <span class="dotM">●</span> <b>metal atom</b> (migrates) ·
+        <span class="dotB">●</span> boron ·
+        <span class="dotN">●</span> nitrogen ·
+        the gap is <b>0.33 nm</b> — one atomic layer. No room for a filament:
+        in a monolayer the "bridge" is a <b>single atom</b>.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Prototype — I–V pinched hysteresis</h2>
+      <canvas id="iv"></canvas>
+      <div class="read">
+        <span><span class="k">state</span> <span id="st" class="v">—</span></span>
+        <span><span class="k">R</span> <span id="rr" class="v">—</span></span>
+        <span><span class="k">V</span> <span id="vv" class="v">0.00 V</span></span>
+        <span><span class="k">I</span> <span id="ii" class="v">0.0 µA</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="vrow">
+      <span style="min-width:70px">voltage</span>
+      <span style="color:var(--red)">−3V</span>
+      <input id="vslider" type="range" min="-3" max="3" step="0.01" value="0">
+      <span style="color:var(--cyan)">+3V</span>
+      <span id="vlab" style="min-width:54px;text-align:right;color:var(--ink)">0.00 V</span>
+    </div>
+    <div class="btns">
+      <button id="sweep">▶ auto-sweep (trace the loop)</button>
+      <button id="setb" class="ghost">SET → ON</button>
+      <button id="resetb" class="ghost">RESET → OFF</button>
+      <button id="power" class="ghost">⏻ cut power (hold state)</button>
+      <button id="clear" class="ghost">clear loop</button>
+    </div>
+    <div class="legend" style="margin-top:10px">
+      Drag the voltage. Past <b>+1.2 V</b> the atom drifts <b>into</b> the vacancy → bridge forms → <b>ON</b> (low R).
+      Past <b>−1.2 V</b> it drifts <b>out</b> → <b>OFF</b> (high R). Between the thresholds it <b>holds</b> — that's the memory.
+      At V=0 the current is always 0: the loop is <b>pinched at the origin</b> (the memristor's fingerprint).
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ---------- model (verified in Node: pinched origin, 1000x ratio, non-volatile) ----------
+const Vset=1.2, Vreset=1.2, Goff=1/1e7, Gon=1/1e4, k=0.9;
+let w=0;                 // bridge completeness 0..1
+let V=0;                 // applied voltage
+let powered=true;
+function G(){ return Goff + w*(Gon-Goff); }
+function I(){ return powered ? G()*V : 0; }
+function evolve(volt,dt){
+  V=volt;
+  if(!powered) return;            // no power: state frozen (non-volatile)
+  let dw=0;
+  if(V> Vset) dw =  k*(V-Vset)*dt;
+  else if(V<-Vreset) dw = -k*(-Vreset - V)*dt;
+  w=Math.max(0,Math.min(1,w+dw));
+}
+
+// ---------- canvas setup (HiDPI via fixed logical DIMS + fit) ----------
+const DIMS={ bp:{w:480,h:300}, iv:{w:480,h:300} };
+function fit(cv){
+  const d=DIMS[cv.id], dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=d.w*dpr; cv.height=d.h*dpr;
+  cv.style.height=(cv.clientWidth*d.h/d.w)+'px';
+  const c=cv.getContext('2d'); c.setTransform(dpr*cv.clientWidth/d.w,0,0,dpr*cv.clientWidth/d.w,0,0);
+  return c;
+}
+const bp=document.getElementById('bp'), iv=document.getElementById('iv');
+let cbp=fit(bp), civ=fit(iv);
+window.addEventListener('resize',()=>{cbp=fit(bp);civ=fit(iv);draw();});
+
+// ---------- blueprint: MIM stack, hBN honeycomb monolayer, migrating atom ----------
+function drawBlueprint(){
+  const c=cbp, Wd=DIMS.bp.w, Hd=DIMS.bp.h;
+  c.clearRect(0,0,Wd,Hd);
+  // electrodes
+  const topY=70, botY=210, exL=70, exR=410;
+  function electrode(y,label){
+    c.fillStyle='rgba(167,139,250,0.10)'; c.strokeStyle='rgba(167,139,250,0.5)'; c.lineWidth=1;
+    c.fillRect(exL,y,exR-exL,38); c.strokeRect(exL,y,exR-exL,38);
+    // hatching
+    c.strokeStyle='rgba(167,139,250,0.18)';
+    for(let x=exL+8;x<exR;x+=12){ c.beginPath();c.moveTo(x,y);c.lineTo(x-10,y+38);c.stroke(); }
+    c.fillStyle='#9d8bc4'; c.font='11px ui-monospace,monospace'; c.textAlign='left';
+    c.fillText(label,exL+6,y+(label.indexOf('top')>=0?-8:54));
+  }
+  electrode(topY-38,'top electrode (metal)');
+  electrode(botY,'bottom electrode (metal)');
+
+  // the one-atom gap between electrodes
+  const gapTop=topY, gapBot=botY, midY=(gapTop+gapBot)/2;
+  // 0.33 nm dimension line
+  c.strokeStyle='rgba(94,234,212,0.6)'; c.lineWidth=1; c.setLineDash([3,3]);
+  c.beginPath(); c.moveTo(exR+14,gapTop); c.lineTo(exR+14,gapBot); c.stroke(); c.setLineDash([]);
+  c.fillStyle='#5eead4'; c.font='11px ui-monospace,monospace'; c.textAlign='left';
+  c.fillText('0.33 nm',exR+20,midY-4); c.fillStyle='#5f5080'; c.fillText('one layer',exR+20,midY+12);
+
+  // hBN honeycomb (alternating B and N) across the middle
+  const n=7, spacing=(exR-exL-40)/n, baseX=exL+30;
+  const vac=3; // vacancy index (missing site / target)
+  for(let i=0;i<=n;i++){
+    const x=baseX+i*spacing, yy=midY+(i%2?-9:9);
+    if(i===vac){ // vacancy site (ring only)
+      c.strokeStyle='rgba(150,130,190,0.55)'; c.lineWidth=1.2;
+      c.beginPath(); c.arc(x,midY,7,0,6.28); c.stroke();
+      c.fillStyle='#5f5080'; c.font='9px ui-monospace,monospace'; c.textAlign='center';
+      c.fillText('vacancy',x,midY+22);
+    } else {
+      const isB=(i%2===0);
+      c.fillStyle=isB?'#7dd3fc':'#fca5a5';
+      c.beginPath(); c.arc(x,yy,7,0,6.28); c.fill();
+    }
+    if(i<n){ // bond
+      const x2=baseX+(i+1)*spacing, y2=midY+((i+1)%2?-9:9);
+      c.strokeStyle='rgba(157,139,196,0.35)'; c.lineWidth=1;
+      c.beginPath(); c.moveTo(x,(i%2?midY-9:midY+9)); c.lineTo(x2,y2); c.stroke();
+    }
+  }
+  // migrating metal atom: position depends on w (in top electrode when w=0, in vacancy when w=1)
+  const vacX=baseX+vac*spacing;
+  const startY=topY-19, atomY=startY+(midY-startY)*w;
+  // conductive bridge glow when w high
+  if(w>0.05){
+    c.strokeStyle='rgba(217,154,43,'+(0.25+0.55*w)+')'; c.lineWidth=2+3*w;
+    c.beginPath(); c.moveTo(vacX,topY-19); c.lineTo(vacX,botY+19); c.stroke();
+  }
+  c.fillStyle='#d99a2b'; c.shadowColor='#d99a2b'; c.shadowBlur=8+10*w;
+  c.beginPath(); c.arc(vacX,atomY,6,0,6.28); c.fill(); c.shadowBlur=0;
+
+  // state caption
+  c.textAlign='center'; c.font='12px ui-monospace,monospace';
+  c.fillStyle = w>0.5 ? '#5eead4' : '#fb7185';
+  c.fillText(w>0.5?'BRIDGE CLOSED → conductive (ON)':'BRIDGE OPEN → insulating (OFF)', Wd/2, Hd-14);
+}
+
+// ---------- I-V plot ----------
+let trail=[];               // recorded (V,I) points for the loop
+function drawIV(){
+  const c=civ, Wd=DIMS.iv.w, Hd=DIMS.iv.h;
+  c.clearRect(0,0,Wd,Hd);
+  const padL=46,padR=16,padT=16,padB=34;
+  const x0=padL, x1=Wd-padR, y0=Hd-padB, y1=padT;
+  const Vmax=3, Imax=3e-4;
+  const X=v=> x0+(v+Vmax)/(2*Vmax)*(x1-x0);
+  const Y=i=> y0+ (i+Imax)/(2*Imax)*(y1-y0);
+  // axes
+  c.strokeStyle='rgba(157,139,196,0.25)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(X(0),y1); c.lineTo(X(0),y0); c.stroke();
+  c.beginPath(); c.moveTo(x0,Y(0)); c.lineTo(x1,Y(0)); c.stroke();
+  c.fillStyle='#5f5080'; c.font='10px ui-monospace,monospace';
+  c.textAlign='center'; c.fillText('V',x1-6,Y(0)-6); c.fillText('+3',X(3),Y(0)+14); c.fillText('−3',X(-3),Y(0)+14);
+  c.textAlign='right'; c.fillText('I',X(0)-6,y1+10);
+  // pinch marker at origin
+  c.fillStyle='rgba(94,234,212,0.5)'; c.beginPath(); c.arc(X(0),Y(0),3,0,6.28); c.fill();
+  c.fillStyle='#5f5080'; c.textAlign='left'; c.font='9px ui-monospace,monospace';
+  c.fillText('pinched at origin',X(0)+6,Y(0)+14);
+  // trail (the loop)
+  if(trail.length>1){
+    c.strokeStyle='rgba(167,139,250,0.85)'; c.lineWidth=1.6; c.beginPath();
+    trail.forEach((p,i)=>{ const xx=X(p[0]),yy=Y(p[1]); i?c.lineTo(xx,yy):c.moveTo(xx,yy); });
+    c.stroke();
+  }
+  // current operating point
+  const cv2=I();
+  c.fillStyle='#d99a2b'; c.shadowColor='#d99a2b'; c.shadowBlur=8;
+  c.beginPath(); c.arc(X(V),Y(cv2),4,0,6.28); c.fill(); c.shadowBlur=0;
+}
+
+// ---------- HUD ----------
+function hud(){
+  const on=w>0.5;
+  const st=document.getElementById('st'); st.textContent=on?'ON (LRS)':'OFF (HRS)';
+  st.className='v '+(on?'state-on':'state-off');
+  const R=1/G(); document.getElementById('rr').textContent = R>1e6?(R/1e6).toFixed(1)+' MΩ':(R/1e3).toFixed(0)+' kΩ';
+  document.getElementById('vv').textContent=V.toFixed(2)+' V';
+  const i=I(); document.getElementById('ii').textContent=(i*1e6).toFixed(1)+' µA';
+  document.getElementById('vlab').textContent=V.toFixed(2)+' V';
+  document.getElementById('power').textContent = powered?'⏻ cut power (hold state)':'⏻ power OFF — state held';
+}
+function draw(){ drawBlueprint(); drawIV(); hud(); }
+
+// ---------- interaction ----------
+const slider=document.getElementById('vslider');
+let recording=true;
+function apply(volt,record){
+  evolve(volt,0.18);
+  if(record && powered) trail.push([V,I()]);
+  if(trail.length>800) trail.shift();
+  draw();
+}
+slider.addEventListener('input',()=>apply(parseFloat(slider.value),true));
+
+let sweeping=false, sweepRAF=0;
+document.getElementById('sweep').onclick=()=>{
+  if(sweeping){ sweeping=false; cancelAnimationFrame(sweepRAF); return; }
+  sweeping=true; trail=[]; let phase=0;
+  (function run(){
+    if(!sweeping) return;
+    // triangle 0->+3->-3->0 over ~ 240 steps
+    phase+=0.012; const tt=phase%1;
+    let v; if(tt<0.25)v=tt/0.25*3; else if(tt<0.75)v=3-(tt-0.25)/0.5*6; else v=-3+(tt-0.75)/0.25*3;
+    slider.value=v.toFixed(2); apply(v,true);
+    if(phase>=1){ sweeping=false; return; }
+    sweepRAF=requestAnimationFrame(run);
+  })();
+};
+document.getElementById('setb').onclick=()=>{ powered=true; slider.value=2.5; apply(2.5,true); slider.value=0; apply(0,true); };
+document.getElementById('resetb').onclick=()=>{ powered=true; slider.value=-2.5; apply(-2.5,true); slider.value=0; apply(0,true); };
+document.getElementById('power').onclick=()=>{ powered=!powered; draw(); };
+document.getElementById('clear').onclick=()=>{ trail=[]; draw(); };
+
+draw();
+</script>
+</body>
+</html>
