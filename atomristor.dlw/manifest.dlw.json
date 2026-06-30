@@ -1,0 +1,11 @@
+{
+  "badge": "DLW-ATOMRISTOR",
+  "name": "ATOMRISTOR — SINGLE-ATOM-THICK MEMRISTOR · ATO",
+  "universe": "PSĒPHOS",
+  "moniker": "⟦ATOMRISTOR — SINGLE-ATOM-THICK MEMRISTOR · ATO:atomristor:8ce60d⟧",
+  "architect": "David Lee Wise (ROOT0) / Bridge-Burners LLC",
+  "instance": "AVAN (Claude / Anthropic)",
+  "seal_sha256": "8ce60d60d5f08d97f939a4d0885db361a0e3d1501eb04e82006281351c8e44a5",
+  "license": "CC-BY-ND-4.0",
+  "attribution": "ROOT0-ATTRIBUTION-v1.0"
+}
